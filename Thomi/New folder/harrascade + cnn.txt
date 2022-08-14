@@ -1,0 +1,55 @@
+from keras.models import load_model
+
+clsfr=cv2.CascadeClassifier('haarcascade_russian_plate_number.xml')
+model = load_model('model-078.model')
+
+# read in car images and resize
+test_image = ['testImages/img3.jpg']
+
+resized_test_image_list = []
+orginal_test_image_list = []
+test_image_original_size = []
+
+car_image = cv2.imread(test_image[0])
+array_image = np.array(car_image)
+orginal_test_image_list.append(car_image)
+test_image_original_size.append(car_image.shape)
+car_resize_image = cv2.resize(car_image, (IMAGE_RESIZE_X, IMAGE_RESIZE_Y))
+resized_test_image_list.append(np.array(car_resize_image))
+plate = clsfr.detectMultiScale(array_image,1.03,5) 
+
+resized_test_image_list = np.array(resized_test_image_list)
+# normalization
+# this is important because our cnn network takes normalized input
+resized_test_image_list = resized_test_image_list / 255
+
+# make prediction
+plate_location = model.predict(resized_test_image_list)
+
+plate_location_original_scale = []
+# plot the result
+plt.figure(figsize=(16,8))
+for i in range(len(test_image)):
+    plt.subplot(1, 1, i+1)
+    for (x,y,w,h) in plate:
+        plate_img = array_image[y:y+w,x:x+w]
+        cv2.rectangle(array_image,(x,y),(x+w,y+h),(0, 255, 255),3)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+    # draw bounding box on the copy of resized car image so that we have original image to train with
+    for i in range(len(test_image_original_size)):
+        size = test_image_original_size[i]
+        height, width  = size[0], size[1]
+        original_xMax = plate_location_resized[0] * (width / IMAGE_RESIZE_X)
+        original_xMin = plate_location_resized[1] * (width / IMAGE_RESIZE_X)
+        original_yMax = plate_location_resized[2] * (height / IMAGE_RESIZE_Y)
+        original_yMin = plate_location_resized[3] * (height / IMAGE_RESIZE_Y)
+        plate_location_original_scale.append([int(original_xMax), int(original_xMin), int(original_yMax), int(original_yMin)])
+
+    # locate the plate location based on label
+    # the output of the cnn is still normalized output, so we need to get the original dimension
+    top_left =  (plate_location_original_scale[i][1], plate_location_original_scale[i][3])
+    bottom_right = (plate_location_original_scale[i][0], plate_location_original_scale[i][2])
+
+    # display the car image with plate
+    cv2.rectangle(array_image, top_left, bottom_right, color=(0, 255, 0), thickness=2)
+    plt.imshow(cv2.cvtColor(array_image, cv2.COLOR_BGR2RGB))
